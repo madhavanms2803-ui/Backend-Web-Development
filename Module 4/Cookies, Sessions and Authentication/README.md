@@ -1,26 +1,48 @@
-# LU48 Starter — Session Authentication
+# Cookies, Sessions and Authentication
+
+Express and Prisma API implementing signed-cookie, server-side session authentication.
 
 ## Setup
 
-```bash
-cp .env.example .env
-npm install
-npm run setup
-npm run dev
-```
+Requirements: Node.js and npm.
 
-Set `COOKIE_SECRET` in `.env` to at least 32 random characters. Keep `COOKIE_SECURE=false` for local HTTP; production must use HTTPS with `COOKIE_SECURE=true`.
+1. Run `npm install`.
+2. Copy `.env.example` to `.env`.
+3. Set `COOKIE_SECRET` to a random secret of at least 32 characters.
+4. Run `npm run setup`.
+5. Start the server with `npm run dev`.
 
-Seeded demo account: `sam@example.com` / `SessionDemo!48`.
+Generate a secret with:
+`node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`
 
-## Implement
+Demo credentials: `sam@example.com` / `SessionDemo!48`.
 
-Complete the TODOs in:
+## Endpoints
 
-- `src/routes/authRoutes.js`
-- `src/session/sessionStore.js`
-- `src/middleware/requireSession.js`
+- `POST /auth/login`: verifies credentials and sets a signed `sid` cookie.
+- `GET /auth/me`: returns safe identity fields for a valid session.
+- `POST /auth/logout`: destroys the server-side session and clears the cookie; returns `204`.
 
-Required endpoints: `POST /auth/login`, `GET /auth/me`, `POST /auth/logout`.
+## Verification
 
-Use Postman cookie jar or curl `-c cookies.txt` and `-b cookies.txt` to preserve the cookie between requests.
+Login and save the cookie:
+`curl -i -c /tmp/session-cookies.txt -H 'Content-Type: application/json' -d '{"email":"sam@example.com","password":"SessionDemo!48"}' http://localhost:3000/auth/login`
+
+Test identity:
+`curl -i -b /tmp/session-cookies.txt http://localhost:3000/auth/me`
+
+Test missing or tampered cookies: expect `401 Unauthorized`.
+
+Logout:
+`curl -i -b /tmp/session-cookies.txt -X POST http://localhost:3000/auth/logout`
+
+Replay the old cookie after logout: expect `401 Unauthorized`.
+
+## Security
+
+- Cookies contain only an opaque session ID, never credentials or user records.
+- Passwords are checked with asynchronous bcrypt comparison.
+- Cookie settings include `HttpOnly`, `SameSite=Lax`, signing, expiry, and configurable `Secure`.
+- Use `COOKIE_SECURE=true` behind HTTPS in production; use `false` for local HTTP testing.
+- The in-memory session store is for learning/local use. Production requires a shared expiring store such as Redis.
+- Never commit `.env` or real secrets.
