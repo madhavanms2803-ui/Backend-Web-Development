@@ -1,16 +1,21 @@
 'use strict';
 
+// ─── GIVEN FILE, do not modify ───────────────────────────────────────────────
 require('dotenv').config();
 
 const express = require('express');
 const { emailQueue } = require('./queue');
 const { generateOTP, storeOTP, verifyOTP, markVerified } = require('./otpStore');
 
+// Worker is started by requiring it, runs as long as the process is alive
 require('./worker');
 
 const app = express();
 app.use(express.json());
 
+// POST /auth/request-verification
+// Generates a 6-digit OTP, stores it, and enqueues an email job.
+// Returns 200 immediately, the email is sent asynchronously by the worker.
 app.post('/auth/request-verification', async (req, res) => {
   try {
     const { email } = req.body;
@@ -27,6 +32,9 @@ app.post('/auth/request-verification', async (req, res) => {
   }
 });
 
+// POST /auth/verify-otp
+// Verifies the OTP submitted by the user.
+// Returns 200 on success, or 401/410/429 on failure.
 app.post('/auth/verify-otp', async (req, res) => {
   try {
     const { email, otp } = req.body;
@@ -36,9 +44,9 @@ app.post('/auth/verify-otp', async (req, res) => {
 
     if (!result.ok) {
       const statusMap = {
-        not_found: 401,
-        wrong_code: 401,
-        expired: 410,
+        not_found:        401,
+        wrong_code:       401,
+        expired:          410,
         too_many_attempts: 429,
       };
       return res.status(statusMap[result.reason] || 400).json({ error: result.reason });
